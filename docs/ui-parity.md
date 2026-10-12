@@ -43,6 +43,7 @@ own (`AGENTS.md`: no Microsoft iconography, ever).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-12 | trivial | Find, Replace and Go To as in Word (#712): Ctrl+F and Home › Find open only the Navigation pane with its search box ready to type in (the selected text searched for); Find and Replace is one dialog with Find, Replace and Go To tabs (Advanced Find, Ctrl+H, Ctrl+G / F5); Go To moves to a page (a number, or +2 / −1 from the current page; Next and Previous step a page) or a bookmark |
 | 2026-10-11 | trivial | Tables on the page: column and row borders and the resize handle drag, with a dashed guide and one undo step per drag (#217) |
 | 2026-10-11 | trivial | Animation effects › Use system setting also reads macOS (Reduce motion) and the Linux/BSD desktops (settings portal: the cross-desktop reduced-motion preference, GNOME's switch, KDE's animation speed; the GTK and KDE settings files where no portal answers), and follows a change without a restart |
 | 2026-10-11 | trivial | Animation effects setting in File › Options › Accessibility (Use system setting, On, Off), kept between runs: the app eased wheel scrolling, zooming and its fades whatever the system's setting was; off, they land at once. Follows the system's setting on Windows and in browsers; `ui.animations` for agents |
