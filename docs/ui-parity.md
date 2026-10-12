@@ -43,6 +43,7 @@ own (`AGENTS.md`: no Microsoft iconography, ever).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-12 | trivial | Search: Alt+Q (and Alt, Q) opens the Search box from anywhere, as in Word; the key's own "q" isn't typed; every word of a query matches, so "insert table" finds Insert › Tables › Table; `tools.search` lists matches for agents (#819) |
 | 2026-10-11 | trivial | Tables on the page: column and row borders and the resize handle drag, with a dashed guide and one undo step per drag (#217) |
 | 2026-10-11 | trivial | Animation effects › Use system setting also reads macOS (Reduce motion) and the Linux/BSD desktops (settings portal: the cross-desktop reduced-motion preference, GNOME's switch, KDE's animation speed; the GTK and KDE settings files where no portal answers), and follows a change without a restart |
 | 2026-10-11 | trivial | Animation effects setting in File › Options › Accessibility (Use system setting, On, Off), kept between runs: the app eased wheel scrolling, zooming and its fades whatever the system's setting was; off, they land at once. Follows the system's setting on Windows and in browsers; `ui.animations` for agents |

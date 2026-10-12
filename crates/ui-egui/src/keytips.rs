@@ -79,6 +79,9 @@ const TAB_LETTERS: [(&str, &str); 11] = [
     ("Help", ""),
 ];
 
+/// The Search box's badge beside the tab badges (Word's Alt, Q).
+pub const SEARCH_LETTER: &str = "Q";
+
 /// The letter badge for a tab (empty when it has none).
 pub fn tab_letter(tab: &str) -> &'static str {
     TAB_LETTERS.iter().find(|(t, _)| *t == tab).map(|(_, l)| *l).unwrap_or("")
@@ -532,6 +535,11 @@ pub fn handle_key(app: &mut WordApp, key: egui::Key) -> bool {
                                 let _ = app.run("ui.tab", serde_json::json!({ "tab": tab }));
                                 app.ui.keytips = Phase::Commands;
                             }
+                            // Q is the title bar's Search box, as in Word (#819).
+                            None if name == SEARCH_LETTER => {
+                                app.ui.keytips = Phase::Off;
+                                let _ = app.run("tools.search", serde_json::json!({}));
+                            }
                             None => app.ui.keytips = Phase::Off,
                         }
                     }
@@ -810,5 +818,18 @@ mod tests {
         assert_eq!(a.ui.keytips, Phase::Commands);
         assert!(handle_key(&mut a, egui::Key::F));
         assert_eq!(a.ui.keytips, Phase::Off);
+    }
+
+    /// Alt, then Q opens Search like Alt+Q (#819); no tab owns Q.
+    #[test]
+    fn alt_then_q_opens_search() {
+        let mut a = app();
+        a.ui.backstage = false;
+        a.dialog = None;
+        assert!(TAB_LETTERS.iter().all(|(_, l)| *l != SEARCH_LETTER));
+        activate(&mut a);
+        assert!(handle_key(&mut a, egui::Key::Q));
+        assert_eq!(a.ui.keytips, Phase::Off);
+        assert!(matches!(a.dialog, Some(crate::dialogs::Dialog::Commands { .. })), "{:?}", a.dialog.as_ref().map(|d| d.name()));
     }
 }
