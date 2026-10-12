@@ -2256,6 +2256,7 @@ fn anchor_floats(
     pb: &mut PageBuilder,
     p: &Paragraph,
     y0: f32,
+    before: f32,
     excl_mark: usize,
     label: &Option<(String, Level)>,
 ) -> (HashMap<usize, Rect>, Arc<ParaLayout>) {
@@ -2273,7 +2274,8 @@ fn anchor_floats(
             if left_out(oi) {
                 continue;
             }
-            let r = float_rect(Some(frame), (col_x, width), y0, w, h, float);
+            // Positions relative to the paragraph start above its space before (Word for Windows).
+            let r = float_rect(Some(frame), (col_x, width), y0 - before, w, h, float);
             rects.insert(oi, r);
             let outline = ctx.wrap_outline(o);
             if let Some(area) = wrap_area(r, float, outline.as_deref().map(|v| v.as_slice())) {
@@ -2410,9 +2412,9 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
     let excl_mark = pb.excl.len();
     let guess = pb.y + space_before;
     let label = ctx.next_label(p);
-    let (mut float_rects, mut pl) = anchor_floats(ctx, pb, p, guess, excl_mark, &label);
-    // The anchor paragraph's top the floats were placed from.
-    let mut anchor_y = guess;
+    let (mut float_rects, mut pl) = anchor_floats(ctx, pb, p, guess, space_before, excl_mark, &label);
+    // The anchor paragraph's top (above its space before) the floats were placed from.
+    let mut anchor_y = pb.y;
     let spot = |pb: &PageBuilder| (pb.pages.len(), pb.col);
     let placed_at = spot(pb);
     if pl.rp.page_break_before && !pb.at_top() && !pb.web {
@@ -2432,6 +2434,7 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
         }
     }
     pb.y += before;
+    let mut applied_before = before;
     // Keep lines together: if it doesn't fit but would on an empty column, move it.
     if pl.rp.keep_lines || pl.rp.keep_next {
         let need = pl.height + if pl.rp.keep_next { next_first_line(ctx, block, width) } else { 0.0 };
@@ -2439,13 +2442,14 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
         if pb.y + need > pb.bottom && !pb.at_top() && need <= pb.uncapped_bottom() - pb.top {
             pb.advance(block, body_top);
             pb.y += pl.rp.space_before.min(0.0);
+            applied_before = pl.rp.space_before.min(0.0);
         }
     }
     // A different top only matters when there is something to wrap around.
     if spot(pb) != placed_at || ((pb.y - guess).abs() > 0.01 && !pb.excl.is_empty()) {
         let y0 = pb.y;
-        (float_rects, pl) = anchor_floats(ctx, pb, p, y0, excl_mark, &label);
-        anchor_y = y0;
+        (float_rects, pl) = anchor_floats(ctx, pb, p, y0, applied_before, excl_mark, &label);
+        anchor_y = y0 - applied_before;
     }
     let mut n = pl.lines.len();
     let mut l0 = 0;
@@ -2534,7 +2538,7 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
                 pb.advance(block, body_top);
                 if l0 == 0 {
                     let y0 = pb.y;
-                    (float_rects, pl) = anchor_floats(ctx, pb, p, y0, excl_mark, &label);
+                    (float_rects, pl) = anchor_floats(ctx, pb, p, y0, 0.0, excl_mark, &label);
                     anchor_y = y0;
                     n = pl.lines.len();
                 }
