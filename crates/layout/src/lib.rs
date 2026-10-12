@@ -770,6 +770,7 @@ fn layout_box(
     let mut float_tables: Vec<Rect> = Vec::new();
     let mut y = 0.0f32;
     let mut prev_after = 0.0f32;
+    let mut prev_after_auto = false;
     let mut prev_style: Option<(String, bool)> = None;
     for (i, b) in blocks.iter().enumerate() {
         let mut path = prefix.to_vec();
@@ -780,9 +781,16 @@ fn layout_box(
                 let mut pl = ctx.para_labelled(p, width, table, &[], label.clone());
                 let ctxl = pl.rp.contextual_spacing;
                 let same = prev_style.as_ref().is_some_and(|(s, c)| *s == pl.rp.style && (*c || ctxl));
-                let before = if same && ctxl { 0.0 } else { pl.rp.space_before };
+                let mut before = if same && ctxl { 0.0 } else { pl.rp.space_before };
                 if same && ctxl {
                     y -= prev_after;
+                }
+                // Automatic spacing: none at the top of a cell or box, and it collapses with the
+                // space after the paragraph above (the larger one counts).
+                if pl.rp.before_auto && i == 0 {
+                    before = 0.0;
+                } else if i > 0 && (pl.rp.before_auto || prev_after_auto) {
+                    before = (before - prev_after).max(0.0);
                 }
                 // Word: space between paragraphs is before + after (no collapsing).
                 y += if i == 0 { before } else { before.max(0.0) };
@@ -815,8 +823,11 @@ fn layout_box(
                     items.splice(at..at, back);
                     items.extend(front);
                 }
-                y += pl.height + pl.rp.space_after;
-                prev_after = if same && ctxl { 0.0 } else { pl.rp.space_after };
+                // Automatic space after: none after the last paragraph of a cell or box.
+                let after = if pl.rp.after_auto && i + 1 == blocks.len() { 0.0 } else { pl.rp.space_after };
+                y += pl.height + after;
+                prev_after = if same && ctxl { 0.0 } else { after };
+                prev_after_auto = pl.rp.after_auto;
                 prev_style = Some((pl.rp.style.clone(), ctxl));
             }
             Block::Table(t) => {
@@ -1040,7 +1051,8 @@ struct PageBuilder<'a> {
     /// Page bottom before footnotes took space.
     orig_bottom: f32,
     /// The previous paragraph: (style, contextual spacing, space after) for contextual spacing.
-    prev: Option<(String, bool, f32)>,
+    /// The paragraph above: its style, contextual spacing, space after and whether that is automatic.
+    prev: Option<(String, bool, f32, bool)>,
     /// Wrap areas of floating objects on this page (see [`wrap_area`]).
     excl: Vec<WrapArea>,
     /// Wrap areas of the floating tables on this page, which others may not overlap.
@@ -2420,16 +2432,27 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
     }
     // Contextual spacing: no space between paragraphs of the same style when either asks for it.
     let mut before = pl.rp.space_before;
-    if let Some((style, ctxl, after)) = pb.prev.take()
-        && style == pl.rp.style
+    let prev = pb.prev.take();
+    if let Some((style, ctxl, after, _)) = &prev
+        && *style == pl.rp.style
         && !pb.at_top()
     {
-        if ctxl {
+        if *ctxl {
             pb.y -= after;
         }
         if pl.rp.contextual_spacing {
             before = 0.0;
         }
+    }
+    // Automatic spacing: none at the top of the document, and it collapses with the space after
+    // the paragraph above (the larger one counts).
+    if pl.rp.before_auto && block == 0 {
+        before = 0.0;
+    } else if let Some((_, _, after, after_auto)) = prev
+        && (pl.rp.before_auto || after_auto)
+        && !pb.at_top()
+    {
+        before = (before - after).max(0.0);
     }
     pb.y += before;
     // Keep lines together: if it doesn't fit but would on an empty column, move it.
@@ -2630,7 +2653,7 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
         }
     }
     pb.y += pl.rp.space_after;
-    pb.prev = Some((pl.rp.style.clone(), pl.rp.contextual_spacing, pl.rp.space_after));
+    pb.prev = Some((pl.rp.style.clone(), pl.rp.contextual_spacing, pl.rp.space_after, pl.rp.after_auto));
 }
 
 /// The outline of the body for an Outline view pass.
