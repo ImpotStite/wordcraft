@@ -763,10 +763,7 @@ pub(crate) fn grow_select_all(s: &mut Session) -> Option<CmdResult> {
             (last_row, last_col, one_cell)
         };
         if cr.rows == (0, last_row) && cr.cols == (0, last_col) {
-            return match tp.cell() {
-                Some((otp, or, oc)) => Some(select_cells(s, &otp, Some((or, Some(oc))))),
-                None => None,
-            };
+            return tp.cell().map(|(otp, or, oc)| select_cells(s, &otp, Some((or, Some(oc)))));
         }
         if cr.rows.0 == cr.rows.1 && cr.cols == (0, last_col) {
             return Some(select_cells(s, &tp, None));
