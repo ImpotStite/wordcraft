@@ -14,7 +14,8 @@ use wordcraft_doc::para::Float;
 
 use super::PartRels;
 use crate::package::{
-    CUSTOM_XML_ROOTS, EMBEDDED_PARTS, EmbeddedManifest, MAX_EMBEDDED_PARTS, MAX_EMBEDDED_RELS, VBA_PROJECT_PART, VBA_RELATED, rel_is, relative, rt,
+    CUSTOM_XML_ROOTS, EMBEDDED_PARTS, EmbeddedManifest, FONT_TABLE_PART, MAX_EMBEDDED_PARTS, MAX_EMBEDDED_RELS, VBA_PROJECT_PART, VBA_RELATED,
+    rel_is, relative, rt,
 };
 use crate::units::{MAX_LEN_PT, emu, int};
 use crate::xml::{self, El, MAX_DEPTH};
@@ -60,6 +61,8 @@ impl<'d> EmbedWriter<'d> {
             "word/endnotes.xml",
             "word/comments.xml",
             "word/commentsextended.xml",
+            "word/commentsids.xml",
+            "word/commentsextensible.xml",
             "[content_types].xml",
         ]
         .iter()
@@ -90,6 +93,14 @@ impl<'d> EmbedWriter<'d> {
         }
     }
 
+    /// Write the font table kept from a file, with the fonts it embeds, relating it from `rels`.
+    pub fn font_table(&mut self, rels: &mut PartRels) {
+        let mut written = Vec::new();
+        if let Some(name) = self.copy_tree(FONT_TABLE_PART, &mut HashMap::new(), &mut written) {
+            rels.add(rt::FONT_TABLE, &relative(STORY_PART, &name), false);
+        }
+    }
+
     /// Reserve the names of the media files this writer writes.
     pub fn reserve_media<'a>(&mut self, files: impl Iterator<Item = &'a String>) {
         for f in files {
@@ -100,7 +111,7 @@ impl<'d> EmbedWriter<'d> {
     /// Names this writer may give its own parts later (headers, footers, package parts).
     fn reserved(lower: &str) -> bool {
         lower.ends_with(".rels")
-            || lower.starts_with("docprops/")
+            || (lower.starts_with("docprops/") && !lower.starts_with("docprops/thumbnail."))
             || lower.starts_with("_rels/")
             || ((lower.starts_with("word/header") || lower.starts_with("word/footer")) && lower.ends_with(".xml"))
     }
@@ -175,6 +186,26 @@ impl<'d> EmbedWriter<'d> {
             let fields: Vec<&str> = line.split('\t').collect();
             let [source, kind, target] = fields.as_slice() else { continue };
             if *source != owner || !rel_is(kind, rt::CUSTOM_XML) {
+                continue;
+            }
+            if let Some(name) = self.copy_tree(target, &mut memo, &mut written) {
+                let source_part = if owner == "P" { "" } else { STORY_PART };
+                rels.add(kind, &relative(source_part, &name), false);
+            }
+        }
+        self.first = memo;
+    }
+
+    /// Reattach the parts kept by `keep_unmodelled` (`UNMODELLED_ROOTS`) to their owner: the
+    /// package (`P`) or the main document (`D`).
+    pub fn unmodelled_rels(&mut self, owner: &str, rels: &mut PartRels) {
+        let Some(roots) = self.passthrough.get(crate::package::UNMODELLED_ROOTS).cloned() else { return };
+        let mut memo = std::mem::take(&mut self.first);
+        let mut written = Vec::new();
+        for line in String::from_utf8_lossy(&roots).lines().take(MAX_EMBEDDED_RELS * 2) {
+            let fields: Vec<&str> = line.split('\t').collect();
+            let [source, kind, target] = fields.as_slice() else { continue };
+            if *source != owner {
                 continue;
             }
             if let Some(name) = self.copy_tree(target, &mut memo, &mut written) {
